@@ -5,11 +5,6 @@ from tkinter import ttk
 from tkinter import filedialog
 from PIL import Image, ImageTk
 
-file_path = None
-image = None
-img_display_width = None
-img_display_height = None
-
 root = tk.Tk()
 root.title("Markly")
 root.geometry("1910x1025")
@@ -21,6 +16,12 @@ style.theme_use("clam")
 style.configure("Main.TFrame", background="#1e1e2e")
 style.configure("Panel.TFrame", background="#1e1e2e")
 style.configure("TButton", background="#7c6af7", foreground="white", font=("Arial", 12), padding=30)
+
+file_path = None
+image = None
+img_display_width = None
+img_display_height = None
+watermark_type = tk.StringVar(value="text")
 
 class RoundedButton:
     def __init__(self, parent, text, command, width=200, height=50, color="#7c6af7", bg="#2a2a3e"):
@@ -47,6 +48,33 @@ class RoundedButton:
 
     def on_leave(self, event):
         self.draw(self.normal_color)
+
+class ToggleButton:
+    def __init__(self, parent, text, value, variable):
+        self.parent = parent
+        self.text = text
+        self.value = value
+        self.variable = variable
+        self.normal_color = "#7c6af7"
+        self.ghost_color = "#2a2a3e"
+        self.canvas = tk.Canvas(parent,width=120, height=40, bg="#2a2a3e" , highlightthickness=0)
+        self.canvas.bind("<Button-1>", self.on_click)
+        self.variable.trace_add("write", self.on_var_change)
+        self.draw()
+
+    def on_click(self, event):
+        self.variable.set(self.value)
+
+    def on_var_change(self, *args):
+        self.draw()
+
+    def draw(self):
+        self.canvas.delete("all")
+        if self.variable.get() == self.value:
+            rounded_rectangle(self.canvas, 2, 2, 118, 38, radius=15, fill=self.normal_color, outline="")
+        else:
+            rounded_rectangle(self.canvas, 2, 2, 118, 38, radius=15, fill=self.ghost_color, outline="#7c6af7", width=3)
+        self.canvas.create_text(60, 20, text=self.text, fill="white", font=("Arial", 10, "bold"))
 
 def rounded_rectangle(canvas, x1, y1, x2, y2, radius=30, **kwargs):
     points = [
@@ -83,6 +111,13 @@ def draw_loaded_state():
     img_y = (canvas.winfo_height() - img_display_height) // 2
     canvas.create_rectangle(img_x, img_y, img_x + img_display_width, img_y + img_display_height, outline="#444466", width=3)
 
+def draw_type_card(event):
+    type_card.delete("all")
+    rounded_rectangle(type_card, x1=1, y1=1, x2=event.width - 1, y2=event.height - 1, radius=20, outline="#444466", fill="#2a2a3e", width=3)
+    type_card.create_window(type_card.winfo_width() // 2, 35, window=type_label, anchor="center")
+    type_card.create_window(type_card.winfo_width() // 2 - 65, 90, window=text_btn.canvas, anchor="center")
+    type_card.create_window(type_card.winfo_width() // 2 + 65, 90, window=image_btn.canvas, anchor="center")
+
 def on_canvas_resize(event):
     if file_path:
         draw_loaded_state()
@@ -116,8 +151,13 @@ main_frame = ttk.Frame(root, style="Main.TFrame")
 panel_frame = ttk.Frame(root, style="Panel.TFrame")
 canvas = tk.Canvas(main_frame, bg="#1e1e2e", highlightthickness=0)
 browse_btn = RoundedButton(canvas, text="Browse Image", width=240, height = 80, command=browse_image)
+type_card = tk.Canvas(panel_frame, bg="#1e1e2e", highlightthickness=0, height=150, width=150)
+type_label = ttk.Label(type_card, text="Choose Watermark Type", background="#2a2a3e", foreground="#ffffff", font=("Arial", 11, "bold"))
+text_btn = ToggleButton(type_card, text="Text", value="text", variable=watermark_type)
+image_btn = ToggleButton(type_card, text="Image", value="image", variable=watermark_type)
 
 canvas.bind("<Configure>", on_canvas_resize)
+type_card.bind("<Configure>", draw_type_card)
 
 root.columnconfigure(index=0, weight=4)
 root.columnconfigure(index=1, weight=1)
@@ -126,8 +166,16 @@ root.rowconfigure(index=0, weight=1)
 main_frame.columnconfigure(index=0, weight=1)
 main_frame.rowconfigure(index=0, weight=1)
 
+panel_frame.columnconfigure(index=0, weight=1)
+panel_frame.rowconfigure(index=0, weight=0)
+panel_frame.rowconfigure(index=1, weight=0)
+panel_frame.rowconfigure(index=2, weight=0)
+panel_frame.rowconfigure(index=3, weight=1)
+
 main_frame.grid(row=0, column=0,sticky="nsew")
 panel_frame.grid(row=0, column=1, sticky="nsew")
-canvas.grid(row=0, column=0, sticky="nsew", pady=17, padx=17)
+canvas.grid(row=0, column=0, sticky="nsew", pady=17, padx=(17, 0))
+type_card.grid(row=0, column=0, sticky="ew", padx=15, pady=(15, 8))
+
 
 root.mainloop()
