@@ -118,6 +118,10 @@ def draw_type_card(event):
     type_card.create_window(type_card.winfo_width() // 2 - 65, 90, window=text_btn.canvas, anchor="center")
     type_card.create_window(type_card.winfo_width() // 2 + 65, 90, window=image_btn.canvas, anchor="center")
 
+def draw_settings_card(event):
+    settings_card.delete("all")
+    rounded_rectangle(settings_card, x1=1, y1=1, x2=event.width - 1, y2=event.height - 1, radius=20, outline="#444466", fill="#2a2a3e", width=3)
+
 def on_canvas_resize(event):
     if file_path:
         draw_loaded_state()
@@ -155,9 +159,11 @@ type_card = tk.Canvas(panel_frame, bg="#1e1e2e", highlightthickness=0, height=15
 type_label = ttk.Label(type_card, text="Choose Watermark Type", background="#2a2a3e", foreground="#ffffff", font=("Arial", 11, "bold"))
 text_btn = ToggleButton(type_card, text="Text", value="text", variable=watermark_type)
 image_btn = ToggleButton(type_card, text="Image", value="image", variable=watermark_type)
+settings_card = tk.Canvas(panel_frame, bg="#1e1e2e", highlightthickness=0, height=180, width=150)
 
 canvas.bind("<Configure>", on_canvas_resize)
 type_card.bind("<Configure>", draw_type_card)
+settings_card.bind("<Configure>", draw_settings_card)
 
 root.columnconfigure(index=0, weight=4)
 root.columnconfigure(index=1, weight=1)
@@ -176,6 +182,7 @@ main_frame.grid(row=0, column=0,sticky="nsew")
 panel_frame.grid(row=0, column=1, sticky="nsew")
 canvas.grid(row=0, column=0, sticky="nsew", pady=17, padx=(17, 0))
 type_card.grid(row=0, column=0, sticky="ew", padx=15, pady=(15, 8))
+settings_card.grid(row=1, column=0, sticky="ew", padx=15, pady=(15, 8))
 
 
 root.mainloop()
