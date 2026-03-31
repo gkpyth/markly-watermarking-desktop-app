@@ -26,6 +26,7 @@ style.theme_use("clam")
 style.configure("Main.TFrame", background="#1e1e2e")
 style.configure("Panel.TFrame", background="#1e1e2e")
 style.configure("TButton", background="#7c6af7", foreground="white", font=("Arial", 12), padding=30)
+style.configure("TEntry", fieldbackground="#3a3a5e", foreground="white", insertcolor="white", borderwidth=0, font=("Arial", 11))
 
 # ============================================================
 # GLOBAL STATE VARIABLES
@@ -150,10 +151,18 @@ def draw_type_card(event):
     type_card.create_window(type_card.winfo_width() // 2 - 65, 90, window=text_btn.canvas, anchor="center")
     type_card.create_window(type_card.winfo_width() // 2 + 65, 90, window=image_btn.canvas, anchor="center")
 
-def draw_settings_card(event):
+def draw_settings_card(event=None):
     """Draws the Watermark Settings card - content changes based on watermark_type's current value."""
     settings_card.delete("all")
-    rounded_rectangle(settings_card, x1=1, y1=1, x2=event.width - 1, y2=event.height - 1, radius=20, outline="#444466", fill="#2a2a3e", width=3)
+    rounded_rectangle(settings_card, x1=1, y1=1, x2=settings_card.winfo_width() - 1, y2=settings_card.winfo_height() - 1, radius=20, outline="#444466", fill="#2a2a3e", width=3)
+    if watermark_type.get() == "text":
+        settings_label.configure(text="Watermark Text:")
+        settings_card.create_window(settings_card.winfo_width() // 2, 45, window=settings_label, anchor="center")
+        settings_card.create_window(settings_card.winfo_width() // 2, 100, window=text_entry, anchor="center")
+    else:
+        settings_label.configure(text="Watermark Image:")
+        settings_card.create_window(settings_card.winfo_width() // 2, 45, window=settings_label, anchor="center")
+        settings_card.create_window(settings_card.winfo_width() // 2, 100, window=watermark_browse_btn.canvas, anchor="center")
 
 # ============================================================
 # EVENT / LOGIC FUNCTIONS (respond to user actions)
@@ -209,6 +218,9 @@ image_btn = ToggleButton(type_card, text="Image", value="image", variable=waterm
 
 # === Panel: Settings Card Widgets ===
 settings_card = tk.Canvas(panel_frame, bg="#1e1e2e", highlightthickness=0, height=180, width=150)
+settings_label = ttk.Label(settings_card, background="#2a2a3e", foreground="#ffffff", font=("Arial", 11, "bold"))
+text_entry = ttk.Entry(settings_card, width=30)
+watermark_browse_btn = RoundedButton(settings_card, text="Browse Image", width=180, height=45, bg="#2a2a3e", command=lambda: print("watermark browse clicked"))
 
 # ============================================================
 # EVENT BINDINGS
@@ -216,6 +228,7 @@ settings_card = tk.Canvas(panel_frame, bg="#1e1e2e", highlightthickness=0, heigh
 canvas.bind("<Configure>", on_canvas_resize)
 type_card.bind("<Configure>", draw_type_card)
 settings_card.bind("<Configure>", draw_settings_card)
+watermark_type.trace_add("write", lambda *args: draw_settings_card())
 
 # ============================================================
 # GRID LAYOUT (place all widgets on screen)
