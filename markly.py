@@ -1,15 +1,25 @@
 import ctypes
-ctypes.windll.shcore.SetProcessDpiAwareness(1)
-import tkinter as tk
-from tkinter import ttk
-from tkinter import filedialog
-from PIL import Image, ImageTk
+ctypes.windll.shcore.SetProcessDpiAwareness(1) # Fix Windows DPI scaling issues
 
+# ============================================================
+# IMPORTS
+# ============================================================
+import tkinter as tk
+from tkinter import ttk             # Themed widgets (modern look)
+from tkinter import filedialog      # OS file picker dialog
+from PIL import Image, ImageTk      # Pillow: image loading, manipulation, and Tkinter bridge
+
+# ============================================================
+# ROOT WINDOW SETUP
+# ============================================================
 root = tk.Tk()
 root.title("Markly")
 root.geometry("1910x1025")
 root.minsize(1910, 1025)
 
+# ============================================================
+# STYLES (ttk theme and widget appearance)
+# ============================================================
 style = ttk.Style(root)
 style.theme_use("clam")
 
@@ -17,13 +27,21 @@ style.configure("Main.TFrame", background="#1e1e2e")
 style.configure("Panel.TFrame", background="#1e1e2e")
 style.configure("TButton", background="#7c6af7", foreground="white", font=("Arial", 12), padding=30)
 
-file_path = None
-image = None
-img_display_width = None
-img_display_height = None
-watermark_type = tk.StringVar(value="text")
+# ============================================================
+# GLOBAL STATE VARIABLES
+# ============================================================
+file_path = None                                    # Path of the loaded image (None = no image loaded)
+image = None                                        # The Pillow Image object (for processing)
+img_display_width = None                            # Width of the resized image displayed on canvas
+img_display_height = None                           # Height of the resized image displayed on canvas
 
+watermark_type = tk.StringVar(value="text")         # Tracks selected watermark mode: "text" or "image"
+
+# ============================================================
+# CLASSES (reusable custom widgets)
+# ============================================================
 class RoundedButton:
+    """A clickable button drawn on a Canvas with rounded corners and hover effect."""
     def __init__(self, parent, text, command, width=200, height=50, color="#7c6af7", bg="#2a2a3e"):
         self.parent = parent
         self.text = text
@@ -49,34 +67,42 @@ class RoundedButton:
     def on_leave(self, event):
         self.draw(self.normal_color)
 
+
 class ToggleButton:
+    """A toggle button that appears filled (selected) or outlined (deselected).
+    Two ToggleButtons sharing the same StringVar will automatically sync with each other."""
     def __init__(self, parent, text, value, variable):
         self.parent = parent
-        self.text = text
-        self.value = value
-        self.variable = variable
+        self.text = text                    # The text to be displayed on the button
+        self.value = value                  # The value this button represents e.g. "text" or "image"
+        self.variable = variable            # The shared StringVar (watermark_type global variable) that both buttons watch
         self.normal_color = "#7c6af7"
         self.ghost_color = "#2a2a3e"
         self.canvas = tk.Canvas(parent,width=120, height=40, bg="#2a2a3e" , highlightthickness=0)
         self.canvas.bind("<Button-1>", self.on_click)
-        self.variable.trace_add("write", self.on_var_change)
+        self.variable.trace_add("write", self.on_var_change)    # Watching for variable changes
         self.draw()
 
     def on_click(self, event):
-        self.variable.set(self.value)
+        self.variable.set(self.value)       # Set the shared variable to this button's value
 
     def on_var_change(self, *args):
-        self.draw()
+        self.draw()                         # Redraw whenever the variable changes
 
     def draw(self):
         self.canvas.delete("all")
-        if self.variable.get() == self.value:
+        if self.variable.get() == self.value:       # This button is selected
             rounded_rectangle(self.canvas, 2, 2, 118, 38, radius=15, fill=self.normal_color, outline="")
-        else:
+        else:                                       # This button is deselected
             rounded_rectangle(self.canvas, 2, 2, 118, 38, radius=15, fill=self.ghost_color, outline="#7c6af7", width=3)
         self.canvas.create_text(60, 20, text=self.text, fill="white", font=("Arial", 10, "bold"))
 
+# ============================================================
+# HELPER FUNCTIONS
+# ============================================================
 def rounded_rectangle(canvas, x1, y1, x2, y2, radius=30, **kwargs):
+    """Draws a rounded rectangle on a Canvas using a smoothed polygon.
+    **kwargs passes styling args (fill, outline, width) straight through to create_polygon."""
     points = [
         x1+radius, y1,
         x2-radius, y1,
@@ -93,7 +119,11 @@ def rounded_rectangle(canvas, x1, y1, x2, y2, radius=30, **kwargs):
     ]
     return canvas.create_polygon(points, smooth=True, **kwargs)
 
+# ============================================================
+# DRAW FUNCTIONS (called by <Configure> bindings and state changes)
+# ============================================================
 def draw_empty_state():
+    """Draws the drop zone UI on the main canvas when no image is loaded."""
     canvas.delete("all")
     rounded_rectangle(canvas, 1, 1, canvas.winfo_width() - 1, canvas.winfo_height() - 1, radius=20, outline="#444466", fill="#2a2a3e", width=3)
     canvas.create_text(canvas.winfo_width() // 2, canvas.winfo_height() // 2 - 80, text="Drop image here", fill="#888899", font=("Arial", 16))
@@ -103,15 +133,17 @@ def draw_empty_state():
     canvas.create_window(canvas.winfo_width() // 2, canvas.winfo_height() // 2 + 105, window=browse_btn.canvas)
 
 def draw_loaded_state():
+    """Draws the loaded image on the main canvas with a border around it."""
     canvas.delete("all")
-    photo = ImageTk.PhotoImage(image)
+    photo = ImageTk.PhotoImage(image)       # Converts Pillow image to Tkinter-compatible format
     canvas.create_image(canvas.winfo_width() // 2, canvas.winfo_height() // 2, image=photo, anchor="center")
-    canvas.image = photo
+    canvas.image = photo                    # Keep reference to prevent garbage collection -> this gave me a headache - !!!REMEMBER!!!
     img_x = (canvas.winfo_width() - img_display_width) // 2
     img_y = (canvas.winfo_height() - img_display_height) // 2
     canvas.create_rectangle(img_x, img_y, img_x + img_display_width, img_y + img_display_height, outline="#444466", width=3)
 
 def draw_type_card(event):
+    """Draws the Watermark Type card with label and Text/Image toggle buttons."""
     type_card.delete("all")
     rounded_rectangle(type_card, x1=1, y1=1, x2=event.width - 1, y2=event.height - 1, radius=20, outline="#444466", fill="#2a2a3e", width=3)
     type_card.create_window(type_card.winfo_width() // 2, 35, window=type_label, anchor="center")
@@ -119,16 +151,22 @@ def draw_type_card(event):
     type_card.create_window(type_card.winfo_width() // 2 + 65, 90, window=image_btn.canvas, anchor="center")
 
 def draw_settings_card(event):
+    """Draws the Watermark Settings card - content changes based on watermark_type's current value."""
     settings_card.delete("all")
     rounded_rectangle(settings_card, x1=1, y1=1, x2=event.width - 1, y2=event.height - 1, radius=20, outline="#444466", fill="#2a2a3e", width=3)
 
+# ============================================================
+# EVENT / LOGIC FUNCTIONS (respond to user actions)
+# ============================================================
 def on_canvas_resize(event):
+    """Fires whenever the main canvas is resized. Redraws the correct state."""
     if file_path:
         draw_loaded_state()
     else:
         draw_empty_state()
 
 def browse_image():
+    """Opens file dialog, loads selected image, scales it to fit canvas, and displays it."""
     global file_path, image, img_display_width, img_display_height
     filetypes = [("Image files", "*.png *.jpg *.jpeg *.bmp")]
     file_path = filedialog.askopenfilename(filetypes=filetypes)
@@ -139,7 +177,7 @@ def browse_image():
         canvas_height = canvas.winfo_height()
 
         img_width, img_height = image.size
-        ratio = min(canvas_width / img_width, canvas_height / img_height)
+        ratio = min(canvas_width / img_width, canvas_height / img_height)       # Scale to fit without stretching
 
         new_width = int(img_width * ratio)
         new_height = int(img_height * ratio)
@@ -151,38 +189,66 @@ def browse_image():
 
         draw_loaded_state()
 
+# ============================================================
+# WIDGET CREATION (instantiate all widgets)
+# ============================================================
+
+# === Main Layout Frames ===
 main_frame = ttk.Frame(root, style="Main.TFrame")
 panel_frame = ttk.Frame(root, style="Panel.TFrame")
+
+# === Main Canvas (image display area) ===
 canvas = tk.Canvas(main_frame, bg="#1e1e2e", highlightthickness=0)
 browse_btn = RoundedButton(canvas, text="Browse Image", width=240, height = 80, command=browse_image)
+
+# === Panel: Type Card Widgets ===
 type_card = tk.Canvas(panel_frame, bg="#1e1e2e", highlightthickness=0, height=150, width=150)
 type_label = ttk.Label(type_card, text="Choose Watermark Type", background="#2a2a3e", foreground="#ffffff", font=("Arial", 11, "bold"))
 text_btn = ToggleButton(type_card, text="Text", value="text", variable=watermark_type)
 image_btn = ToggleButton(type_card, text="Image", value="image", variable=watermark_type)
+
+# === Panel: Settings Card Widgets ===
 settings_card = tk.Canvas(panel_frame, bg="#1e1e2e", highlightthickness=0, height=180, width=150)
 
+# ============================================================
+# EVENT BINDINGS
+# ============================================================
 canvas.bind("<Configure>", on_canvas_resize)
 type_card.bind("<Configure>", draw_type_card)
 settings_card.bind("<Configure>", draw_settings_card)
 
+# ============================================================
+# GRID LAYOUT (place all widgets on screen)
+# ============================================================
+
+# Root Grid - 2 columns: main area (weight 4) and panel (weight 1)
 root.columnconfigure(index=0, weight=4)
 root.columnconfigure(index=1, weight=1)
 root.rowconfigure(index=0, weight=1)
 
+# Main Frame Grid - single cell, canvas fills it
 main_frame.columnconfigure(index=0, weight=1)
 main_frame.rowconfigure(index=0, weight=1)
 
+# Panel Frame Grid - cards stack vertically with a spacer row at the bottom pushing cards up
 panel_frame.columnconfigure(index=0, weight=1)
 panel_frame.rowconfigure(index=0, weight=0)
 panel_frame.rowconfigure(index=1, weight=0)
 panel_frame.rowconfigure(index=2, weight=0)
 panel_frame.rowconfigure(index=3, weight=1)
 
+# Place Frames
 main_frame.grid(row=0, column=0,sticky="nsew")
 panel_frame.grid(row=0, column=1, sticky="nsew")
+
+# Place Main Canvas
 canvas.grid(row=0, column=0, sticky="nsew", pady=17, padx=(17, 0))
+
+# Place Panel Cards
 type_card.grid(row=0, column=0, sticky="ew", padx=15, pady=(15, 8))
 settings_card.grid(row=1, column=0, sticky="ew", padx=15, pady=(15, 8))
 
-
+# ============================================================
+# START APPLICATION
+# ============================================================
 root.mainloop()
