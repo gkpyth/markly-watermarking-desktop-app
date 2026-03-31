@@ -34,13 +34,13 @@ class RoundedButton:
     def draw(self, color):
         self.canvas.delete("all")
         rounded_rectangle(self.canvas, 2, 2, self.width - 2, self.height - 2, radius=15, fill=color, outline="")
-        self.canvas.create_text(self.width // 2, self.height // 2, text=self.text, fill="white", font=("Arial", 12, "bold"))
+        self.canvas.create_text(self.width // 2, self.height // 2, text=self.text, fill="white", font=("Arial", 12))
 
     def on_enter(self, event):
-        pass
+        self.draw(self.hover_color)
 
     def on_leave(self, event):
-        pass
+        self.draw(self.normal_color)
 
 def rounded_rectangle(canvas, x1, y1, x2, y2, radius=30, **kwargs):
     points = [
@@ -66,12 +66,12 @@ def draw_border(event):
     canvas.create_line(event.width // 2 - 30, event.height // 2, event.width // 2- 115, event.height//2, fill="#888899", width=2)
     canvas.create_text(event.width // 2, event.height // 2, text="OR", fill="#888899", font=("Arial", 9))
     canvas.create_line(event.width // 2 + 30, event.height // 2, event.width // 2 + 115, event.height // 2,fill="#888899", width=2)
-    canvas.create_window(event.width // 2, event.height // 2 + 115, window=browse_btn)
+    canvas.create_window(event.width // 2, event.height // 2 + 105, window=browse_btn.canvas)
 
 main_frame = ttk.Frame(root, style="Main.TFrame")
 panel_frame = ttk.Frame(root, style="Panel.TFrame")
 canvas = tk.Canvas(main_frame, bg="#1e1e2e", highlightthickness=0)
-browse_btn = ttk.Button(canvas, text="Browse Images")
+browse_btn = RoundedButton(canvas, text="Browse Image", width=240, height = 80, command=lambda: print("browse clicked"))
 
 canvas.bind("<Configure>", draw_border)
 
