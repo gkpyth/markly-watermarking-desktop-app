@@ -50,7 +50,7 @@ class RoundedButton:
         self.width = width
         self.height = height
         self.normal_color = color
-        self.hover_color = "#9d8ff9"
+        self.hover_color = lighten_color(color)
         self.canvas = tk.Canvas(parent, width=width, height=height, bg=bg, highlightthickness=0)
         self.draw(self.normal_color)
         self.canvas.bind("<Button-1>", lambda e: command())
@@ -81,7 +81,7 @@ class ToggleButton:
         self.ghost_color = "#2a2a3e"
         self.canvas = tk.Canvas(parent,width=120, height=40, bg="#2a2a3e" , highlightthickness=0)
         self.canvas.bind("<Button-1>", self.on_click)
-        self.variable.trace_add("write", self.on_var_change)    # Watching for variable changes
+        self.variable.trace_add("write", self.on_var_change)    # Watching for variable changes and calling on_var_change() to draw()
         self.draw()
 
     def on_click(self, event):
@@ -119,6 +119,15 @@ def rounded_rectangle(canvas, x1, y1, x2, y2, radius=30, **kwargs):
         x1, y1,
     ]
     return canvas.create_polygon(points, smooth=True, **kwargs)
+
+def lighten_color(hex_color, amount=30):
+    """Takes a hex color string and returns a slightly lighter version."""
+    hex_color = hex_color.lstrip("#")
+    r, g, b = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    r = min(255, r + amount)
+    g = min(255, g + amount)
+    b = min(255, b + amount)
+    return f"#{r:02x}{g:02x}{b:02x}"
 
 # ============================================================
 # DRAW FUNCTIONS (called by <Configure> bindings and state changes)
@@ -163,6 +172,22 @@ def draw_settings_card(event=None):
         settings_label.configure(text="Watermark Image:")
         settings_card.create_window(settings_card.winfo_width() // 2, 45, window=settings_label, anchor="center")
         settings_card.create_window(settings_card.winfo_width() // 2, 100, window=watermark_browse_btn.canvas, anchor="center")
+
+def draw_actions_card(event=None):
+    """Draws the Actions card with 3 RoundedButtons - Cancel, Preview, and Save"""
+    actions_card.delete("all")
+    rounded_rectangle(actions_card, x1=1, y1=1, x2=actions_card.winfo_width() - 1, y2=actions_card.winfo_height() - 1, radius=20, outline="#444466", fill="#2a2a3e", width=3)
+    actions_card.create_window(actions_card.winfo_width() // 2, 60, window=cancel_btn.canvas, anchor="center")
+    actions_card.create_window(actions_card.winfo_width() // 2 - 80, 120, window=preview_btn.canvas, anchor="center")
+    actions_card.create_window(actions_card.winfo_width() // 2 + 80, 120, window=save_btn.canvas, anchor="center")
+
+def cancel():
+    global file_path, image, img_display_width, img_display_height
+    file_path=None
+    image = None
+    img_display_width = None
+    img_display_height = None
+    draw_empty_state()
 
 # ============================================================
 # EVENT / LOGIC FUNCTIONS (respond to user actions)
@@ -222,6 +247,12 @@ settings_label = ttk.Label(settings_card, background="#2a2a3e", foreground="#fff
 text_entry = ttk.Entry(settings_card, width=30)
 watermark_browse_btn = RoundedButton(settings_card, text="Browse Image", width=180, height=45, bg="#2a2a3e", command=lambda: print("watermark browse clicked"))
 
+# === Panel: Actions Card Widgets ===
+actions_card = tk.Canvas(panel_frame, bg="#1e1e2e", highlightthickness=0, height=180, width=150)
+cancel_btn = RoundedButton(actions_card, text="Cancel", width=300, height=45, color="#e05555", bg="#2a2a3e", command=cancel)
+preview_btn = RoundedButton(actions_card, text="Preview", width=140, height=45, color="#7c6af7", bg="#2a2a3e", command=lambda: print("Preview clicked"))
+save_btn = RoundedButton(actions_card, text="Save", width=140, height=45, color="#4caf82", bg="#2a2a3e", command=lambda: print("Save clicked"))
+
 # ============================================================
 # EVENT BINDINGS
 # ============================================================
@@ -229,6 +260,7 @@ canvas.bind("<Configure>", on_canvas_resize)
 type_card.bind("<Configure>", draw_type_card)
 settings_card.bind("<Configure>", draw_settings_card)
 watermark_type.trace_add("write", lambda *args: draw_settings_card())
+actions_card.bind("<Configure>", draw_actions_card)
 
 # ============================================================
 # GRID LAYOUT (place all widgets on screen)
@@ -260,6 +292,7 @@ canvas.grid(row=0, column=0, sticky="nsew", pady=17, padx=(17, 0))
 # Place Panel Cards
 type_card.grid(row=0, column=0, sticky="ew", padx=15, pady=(15, 8))
 settings_card.grid(row=1, column=0, sticky="ew", padx=15, pady=(15, 8))
+actions_card.grid(row=2, column=0, sticky="ew", padx=15, pady=(15, 8))
 
 # ============================================================
 # START APPLICATION
