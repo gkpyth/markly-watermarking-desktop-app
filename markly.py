@@ -25,7 +25,6 @@ style.theme_use("clam")
 
 style.configure("Main.TFrame", background="#1e1e2e")
 style.configure("Panel.TFrame", background="#1e1e2e")
-style.configure("TButton", background="#7c6af7", foreground="white", font=("Arial", 12), padding=30)
 style.configure("TEntry", fieldbackground="#3a3a5e", foreground="white", insertcolor="white", borderwidth=0, font=("Arial", 11))
 
 # ============================================================
@@ -33,8 +32,6 @@ style.configure("TEntry", fieldbackground="#3a3a5e", foreground="white", insertc
 # ============================================================
 file_path = None                                    # Path of the loaded image (None = no image loaded)
 image = None                                        # The Pillow Image object (for processing)
-img_display_width = None                            # Width of the resized image displayed on canvas
-img_display_height = None                           # Height of the resized image displayed on canvas
 
 watermark_type = tk.StringVar(value="text")         # Tracks selected watermark mode: "text" or "image"
 
@@ -158,12 +155,23 @@ def draw_empty_state():
 
 def draw_loaded_state():
     """Draws the loaded image on the main canvas with a border around it."""
+    global img_display_width, img_display_height
     canvas.delete("all")
-    photo = ImageTk.PhotoImage(image)       # Converts Pillow image to Tkinter-compatible format
-    canvas.create_image(canvas.winfo_width() // 2, canvas.winfo_height() // 2, image=photo, anchor="center")
-    canvas.image = photo                    # Keep reference to prevent garbage collection -> this gave me a headache - !!!REMEMBER!!!
-    img_x = (canvas.winfo_width() - img_display_width) // 2
-    img_y = (canvas.winfo_height() - img_display_height) // 2
+
+    canvas_width = canvas.winfo_width()
+    canvas_height = canvas.winfo_height()
+
+    img_width, img_height = image.size
+    ratio = min(canvas_width / img_width, canvas_height / img_height)
+    img_display_width = int(img_width * ratio)
+    img_display_height = int(img_height * ratio)
+
+    display_img = image.resize((img_display_width, img_display_height))
+    photo = ImageTk.PhotoImage(display_img)
+    canvas.create_image(canvas_width // 2, canvas_height // 2, image=photo, anchor="center")
+    canvas.image = photo
+    img_x = (canvas_width - img_display_width) // 2
+    img_y = (canvas_height - img_display_height) // 2
     canvas.create_rectangle(img_x, img_y, img_x + img_display_width, img_y + img_display_height, outline="#444466", width=3)
 
 def draw_type_card(event):
@@ -196,11 +204,12 @@ def draw_actions_card(event=None):
     actions_card.create_window(actions_card.winfo_width() // 2 + 80, 120, window=save_btn.canvas, anchor="center")
 
 def cancel():
-    global file_path, image, img_display_width, img_display_height
+    global file_path, image, img_display_width, img_display_height, watermarked_image
     file_path=None
     image = None
     img_display_width = None
     img_display_height = None
+    watermarked_image = None
     draw_empty_state()
     cancel_btn.disable()
     preview_btn.disable()
@@ -211,7 +220,7 @@ def cancel():
 # ============================================================
 def apply_watermark():
     global watermarked_image
-    opacity = int(255 * 0.3)        # 0.0 = invisible, 1.0 = fully opaque
+    opacity = int(255 * 0.25)        # 0.0 = invisible, 1.0 = fully opaque
     if not file_path:
         return
 
@@ -280,28 +289,12 @@ def on_canvas_resize(event):
 
 def browse_image():
     """Opens file dialog, loads selected image, scales it to fit canvas, and displays it."""
-    global file_path, image, img_display_width, img_display_height
+    global file_path, image
     filetypes = [("Image files", "*.png *.jpg *.jpeg *.bmp")]
     file_path = filedialog.askopenfilename(filetypes=filetypes)
     if file_path:
         image = Image.open(file_path)
-
-        canvas_width = canvas.winfo_width()
-        canvas_height = canvas.winfo_height()
-
-        img_width, img_height = image.size
-        ratio = min(canvas_width / img_width, canvas_height / img_height)       # Scale to fit without stretching
-
-        new_width = int(img_width * ratio)
-        new_height = int(img_height * ratio)
-
-        img_display_width = new_width
-        img_display_height = new_height
-
-        image = image.resize((new_width, new_height))
-
         draw_loaded_state()
-
         cancel_btn.enable()
         preview_btn.enable()
         save_btn.enable()
