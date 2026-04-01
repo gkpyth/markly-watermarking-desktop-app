@@ -71,6 +71,17 @@ class RoundedButton:
     def on_leave(self, event):
         self.draw(self.normal_color)
 
+    def disable(self):
+        self.canvas.unbind("<Button-1>")
+        self.canvas.unbind("<Enter>")
+        self.canvas.unbind("<Leave>")
+        self.draw("#555566")
+
+    def enable(self):
+        self.canvas.bind("<Button-1>", lambda e: self.command())
+        self.canvas.bind("<Enter>", self.on_enter)
+        self.canvas.bind("<Leave>", self.on_leave)
+        self.draw(self.normal_color)
 
 class ToggleButton:
     """A toggle button that appears filled (selected) or outlined (deselected).
@@ -191,6 +202,9 @@ def cancel():
     img_display_width = None
     img_display_height = None
     draw_empty_state()
+    cancel_btn.disable()
+    preview_btn.disable()
+    save_btn.disable()
 
 # ============================================================
 # PILLOW FUNCTIONS
@@ -288,6 +302,10 @@ def browse_image():
 
         draw_loaded_state()
 
+        cancel_btn.enable()
+        preview_btn.enable()
+        save_btn.enable()
+
 def display_watermarked():
     """Converts watermarked image to RGB, resizes to fit canvas, and displays it with border."""
     global image, img_display_width, img_display_height
@@ -361,6 +379,9 @@ actions_card = tk.Canvas(panel_frame, bg="#1e1e2e", highlightthickness=0, height
 cancel_btn = RoundedButton(actions_card, text="Cancel", width=300, height=45, color="#e05555", bg="#2a2a3e", command=cancel)
 preview_btn = RoundedButton(actions_card, text="Preview", width=140, height=45, color="#7c6af7", bg="#2a2a3e", command=apply_watermark)
 save_btn = RoundedButton(actions_card, text="Save", width=140, height=45, color="#4caf82", bg="#2a2a3e", command=save_image)
+cancel_btn.disable()
+preview_btn.disable()
+save_btn.disable()
 
 # ============================================================
 # EVENT BINDINGS
