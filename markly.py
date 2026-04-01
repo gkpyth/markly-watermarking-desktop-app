@@ -5,9 +5,9 @@ ctypes.windll.shcore.SetProcessDpiAwareness(1) # Fix Windows DPI scaling issues
 # IMPORTS
 # ============================================================
 import tkinter as tk
-from tkinter import ttk             # Themed widgets (modern look)
-from tkinter import filedialog      # OS file picker dialog
-from PIL import Image, ImageTk      # Pillow: image loading, manipulation, and Tkinter bridge
+from tkinter import ttk                                     # Themed widgets (modern look)
+from tkinter import filedialog                              # OS file picker dialog
+from PIL import Image, ImageTk, ImageDraw, ImageFont        # Pillow: image loading, manipulation, and Tkinter bridge
 
 # ============================================================
 # ROOT WINDOW SETUP
@@ -37,6 +37,9 @@ img_display_width = None                            # Width of the resized image
 img_display_height = None                           # Height of the resized image displayed on canvas
 
 watermark_type = tk.StringVar(value="text")         # Tracks selected watermark mode: "text" or "image"
+
+watermarked_image = None                            # Store the watermarked image so Save can access it
+watermark_path = None                               # Path of the loaded watermark image (None = no image loaded)
 
 # ============================================================
 # CLASSES (reusable custom widgets)
@@ -190,11 +193,73 @@ def cancel():
     draw_empty_state()
 
 # ============================================================
+# PILLOW FUNCTIONS
+# ============================================================
+def apply_watermark():
+    global watermarked_image
+    opacity = int(255 * 0.3)        # 0.0 = invisible, 1.0 = fully opaque
+    if not file_path:
+        return
+
+    original = Image.open(file_path).convert("RGBA")
+    overlay = Image.new("RGBA", original.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+
+    if watermark_type.get() == "text":
+        text = text_entry.get()
+        if not text:
+            return
+
+        font = ImageFont.truetype("arial.ttf", size=60)
+        bbox = draw.textbbox((0, 0), text, font=font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+
+        center_x = original.width // 2
+        center_y = original.height // 2
+
+        txt_img = Image.new("RGBA", original.size, (0, 0, 0, 0))
+        txt_draw = ImageDraw.Draw(txt_img)
+
+        txt_draw.text((center_x -text_width // 2, center_y - text_height // 2), text, font=font, fill=(255, 255, 255, opacity))
+
+        txt_img = txt_img.rotate(45, expand=False)
+        overlay = Image.alpha_composite(overlay, txt_img)
+
+    else:
+        if not watermark_path:
+            return
+
+        watermark_img = Image.open(watermark_path).convert("RGBA")
+
+        # Resize watermark to 30% (0.3) of original image width, maintaining aspect ratio
+        wm_ratio = original.width * 0.3 / watermark_img.width
+        wm_width = int(watermark_img.width * wm_ratio)
+        wm_height = int(watermark_img.height * wm_ratio)
+        watermark_img = watermark_img.resize((wm_width, wm_height))
+
+        # Apply opacity - e.g. 0.5 = 50%
+        opacity = int(255 * 0.5)
+        r, g, b, a = watermark_img.split()
+        a = a.point(lambda x: int(x * opacity / 255))
+        watermark_img = Image.merge("RGBA", (r, g, b, a))
+
+        # Paste centered onto overlay
+        center_x = (original.width - wm_width) // 2
+        center_y = (original.height - wm_height) // 2
+        overlay.paste(watermark_img, (center_x, center_y), watermark_img)
+
+    watermarked_image = Image.alpha_composite(original, overlay)
+    display_watermarked()
+
+# ============================================================
 # EVENT / LOGIC FUNCTIONS (respond to user actions)
 # ============================================================
 def on_canvas_resize(event):
     """Fires whenever the main canvas is resized. Redraws the correct state."""
-    if file_path:
+    if watermarked_image:
+        display_watermarked()
+    elif file_path:
         draw_loaded_state()
     else:
         draw_empty_state()
@@ -223,6 +288,50 @@ def browse_image():
 
         draw_loaded_state()
 
+def display_watermarked():
+    """Converts watermarked image to RGB, resizes to fit canvas, and displays it with border."""
+    global image, img_display_width, img_display_height
+
+    # Convert RGBA to RGB for display
+    display_img = watermarked_image.convert("RGB")
+
+    # Resize to fit the canvas
+    canvas_width = canvas.winfo_width()
+    canvas_height = canvas.winfo_height()
+    ratio = min(canvas_width / display_img.width, canvas_height / display_img.height)
+    new_width = int(display_img.width * ratio)
+    new_height = int(display_img.height * ratio)
+    img_display_width = new_width
+    img_display_height = new_height
+    display_img = display_img.resize((new_width, new_height))
+
+    # Display on the canvas
+    photo = ImageTk.PhotoImage(display_img)
+    canvas.delete("all")
+    canvas.create_image(canvas.winfo_width() // 2, canvas.winfo_height() // 2, image=photo, anchor="center")
+    canvas.image = photo
+    img_x = (canvas.winfo_width() - new_width) // 2
+    img_y = (canvas.winfo_height() - new_height) // 2
+    canvas.create_rectangle(img_x, img_y, img_x + new_width, img_y + new_height, outline="#444466", width=3)
+
+def browse_watermark():
+    global watermark_path
+    filetypes = [("Image files", "*.png *.jpg *.jpeg *.bmp")]
+    watermark_path = filedialog.askopenfilename(filetypes=filetypes)
+
+def save_image():
+    if not watermarked_image:
+        return
+
+    filetypes = [("Image files", "*.png *.jpg *.jpeg")]
+    save_path = filedialog.asksaveasfilename(filetypes=filetypes, defaultextension=".png")
+
+    if save_path:
+        if save_path.endswith(".jpg") or save_path.endswith(".jpeg"):
+            watermarked_image.convert("RGB").save(save_path)
+        else:
+            watermarked_image.save(save_path)
+
 # ============================================================
 # WIDGET CREATION (instantiate all widgets)
 # ============================================================
@@ -245,13 +354,13 @@ image_btn = ToggleButton(type_card, text="Image", value="image", variable=waterm
 settings_card = tk.Canvas(panel_frame, bg="#1e1e2e", highlightthickness=0, height=180, width=150)
 settings_label = ttk.Label(settings_card, background="#2a2a3e", foreground="#ffffff", font=("Arial", 11, "bold"))
 text_entry = ttk.Entry(settings_card, width=30)
-watermark_browse_btn = RoundedButton(settings_card, text="Browse Image", width=180, height=45, bg="#2a2a3e", command=lambda: print("watermark browse clicked"))
+watermark_browse_btn = RoundedButton(settings_card, text="Browse Image", width=180, height=45, bg="#2a2a3e", command=browse_watermark)
 
 # === Panel: Actions Card Widgets ===
 actions_card = tk.Canvas(panel_frame, bg="#1e1e2e", highlightthickness=0, height=180, width=150)
 cancel_btn = RoundedButton(actions_card, text="Cancel", width=300, height=45, color="#e05555", bg="#2a2a3e", command=cancel)
-preview_btn = RoundedButton(actions_card, text="Preview", width=140, height=45, color="#7c6af7", bg="#2a2a3e", command=lambda: print("Preview clicked"))
-save_btn = RoundedButton(actions_card, text="Save", width=140, height=45, color="#4caf82", bg="#2a2a3e", command=lambda: print("Save clicked"))
+preview_btn = RoundedButton(actions_card, text="Preview", width=140, height=45, color="#7c6af7", bg="#2a2a3e", command=apply_watermark)
+save_btn = RoundedButton(actions_card, text="Save", width=140, height=45, color="#4caf82", bg="#2a2a3e", command=save_image)
 
 # ============================================================
 # EVENT BINDINGS
